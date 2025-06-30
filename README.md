@@ -18,4 +18,5 @@ None
 
 ## Coverage
 
-- [ ] Passes all server tests in the Autobahn Test Suite
+- [ ] tcp connections can be established, tracked and closed
+- [ ] passes all server tests in the Autobahn Test Suite
