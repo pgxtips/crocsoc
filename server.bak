@@ -1,4 +1,4 @@
-package server
+package websocket 
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 )
+
 
 func TerminateServer(host string, port string, listener net.Listener) {
 	slog.Info(fmt.Sprintf("terminating listener: %s:%s", host, port))
