@@ -1,11 +1,13 @@
 package tests
 
 import (
+	"fmt"
 	"net/http"
 	"github.com/pgxtips/crocsoc"
 )
 
-func StartServer(){
+func StartServer(port string){
 	http.HandleFunc("/ws", crocsoc.WsHandler)
-	_ = http.ListenAndServe(":8080", nil)
-}
+	portStr := fmt.Sprintf(":%s", port)
+	_ = http.ListenAndServe(portStr, nil)
+} 

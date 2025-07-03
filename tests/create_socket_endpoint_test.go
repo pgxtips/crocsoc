@@ -6,8 +6,9 @@ import (
 	"net/http"
 )
 
+// testing the endpoint exists and functions
 func TestHttpEp(t *testing.T){
-	go StartServer()
+	go StartServer("8080")
 	time.Sleep(150 * time.Millisecond)
 
 	resp, err := http.Get("http://localhost:8080/ws")
@@ -21,7 +22,7 @@ func TestHttpEp(t *testing.T){
 	}	
 }
 
-func TestHttpHandshake(t *testing.T){
-	go StartServer()
-	time.Sleep(150 * time.Millisecond)
-}
+// func TestHttpHandshake(t *testing.T){
+// 	go StartServer("8080")
+// 	time.Sleep(150 * time.Millisecond)
+// }
