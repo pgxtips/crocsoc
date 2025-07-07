@@ -26,6 +26,7 @@ Sec-WebSocket-Version: 13
 
 func buildRequest(headers map[string]string) *http.Request {
 	r, _ := http.NewRequest("GET", "/chat", nil)
+	r.Host = "localhost:8080"
 	for k, v := range headers {
 		r.Header.Set(k, v)
 	}

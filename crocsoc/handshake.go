@@ -44,14 +44,68 @@ websocket server packets that are carefully crafted using XMLHttpRequest or a
 form submission.
 */
 
+/*
+The client's opening handshake consists of the following parts.  If
+the server, while reading the handshake, finds that the client did
+not send a handshake that matches the description below (note that as
+per [RFC2616], the order of the header fields is not important),
+including but not limited to any violations of the ABNF grammar
+specified for the components of the handshake, the server MUST stop
+processing the client's handshake and return an HTTP response with an
+appropriate error code (such as 400 Bad Request).
+
+[x] - An HTTP/1.1 or higher GET request, including a "Request-URI"
+	[RFC2616] that should be interpreted as a /resource name/
+	defined in Section 3 (or an absolute HTTP/HTTPS URI containing
+	the /resource name/).
+
+[x] - A |Host| header field containing the server's authority.
+
+[x] - An |Upgrade| header field containing the value "websocket",
+	treated as an ASCII case-insensitive value.
+
+[x] - A |Connection| header field that includes the token "Upgrade",
+	treated as an ASCII case-insensitive value.
+
+[x] - A |Sec-WebSocket-Key| header field with a base64-encoded (see
+	Section 4 of [RFC4648]) value that, when decoded, is 16 bytes in
+	length.
+
+[x] - A |Sec-WebSocket-Version| header field, with a value of 13.
+
+[ ] - Optionally, an |Origin| header field.  This header field is sent
+	by all browser clients.  A connection attempt lacking this
+	header field SHOULD NOT be interpreted as coming from a browser
+	client.
+
+[ ] - Optionally, a |Sec-WebSocket-Protocol| header field, with a list
+	of values indicating which protocols the client would like to
+	speak, ordered by preference.
+
+[ ] - Optionally, a |Sec-WebSocket-Extensions| header field, with a
+	list of values indicating which extensions the client would like
+	to speak.  The interpretation of this header field is discussed
+	in Section 9.1.
+
+Optionally, other header fields, such as those used to send
+	cookies or request authentication to a server.  Unknown header
+	fields are ignored, as per [RFC2616].
+*/
+
 // Ensures that all the required headers and values for the 
 // "1.3 Opening Handshake" are present in GET request.
 func ValidateHeaders(r *http.Request) error {
 	// header validation
+    wh := r.Host
     wv := r.Header.Get("Sec-WebSocket-Version")
     wk := r.Header.Get("Sec-WebSocket-Key")
     wu := r.Header.Get("Upgrade")
     wc := r.Header.Get("Connection")
+
+	// check host
+	if wh == "" {
+		return fmt.Errorf("missing host header")
+	}
 
 	// check exists
 	if slices.Contains([]string{wv, wk, wu, wc}, "") {
@@ -72,6 +126,20 @@ func ValidateHeaders(r *http.Request) error {
 
 	if !slices.Contains(connVals, "upgrade"){
 		return fmt.Errorf("connection missing upgrade value")
+	}
+
+	// ensure that the Sec-WebSocket-Version is 13 as per the RFC
+	if wv != "13" {
+		return fmt.Errorf("Invalid Sec-WebSocket-Version")
+	}
+
+	// check that the client key decoded to 16 bytes
+	decodedKey, err := base64.StdEncoding.DecodeString(wk)
+	if err != nil {
+		return fmt.Errorf("failed to decode client key: %v", err)
+	}
+	if len(decodedKey) != 16 {
+		return fmt.Errorf("Sec-WebSocket-Key exceeds 16 bytes, got: %v", decodedKey)
 	}
 
 	return nil
@@ -142,13 +210,22 @@ cookies, as described in [RFC6265].
 */
 
 func OpeningHandshake(w http.ResponseWriter, r *http.Request) {
+
+	// only allow GET methods
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusBadRequest)
+	}
+
+	// ensure that headers are correctly sent
 	if err := ValidateHeaders(r); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	// create the server response hash
 	h := SecAcceptSha(r.Header.Get("Sec-WebSocket-Key"))
 	b64 := base64.StdEncoding.EncodeToString(h)
+
 
 	w.Header().Add("Upgrade", "websocket")
 	w.Header().Add("Connection", "Upgrade")
