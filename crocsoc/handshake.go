@@ -365,17 +365,16 @@ sending (and receiving) data.
 
 */
 
-func OpeningHandshake(w http.ResponseWriter, r *http.Request) {
+func OpeningHandshake(w http.ResponseWriter, r *http.Request) error {
 
 	// only allow GET methods
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusBadRequest)
+		return fmt.Errorf("Method Not Allowed")
 	}
 
 	// ensure that headers are correctly received 
 	if err := ValidateHeaders(r); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return fmt.Errorf(err.Error())
 	}
 
 	// create the server response hash
@@ -386,4 +385,6 @@ func OpeningHandshake(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Connection", "Upgrade")
 	w.Header().Add("Sec-WebSocket-Accept", b64)
 	w.WriteHeader(http.StatusSwitchingProtocols)
+
+	return nil
 }

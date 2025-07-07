@@ -7,6 +7,7 @@ A complete RFC-compliant implementation of the websocket protocol.
 - [x] RFC-6455 1.3 Opening Handshake (basic)
 - [x] RFC-6455 4.2.1 Reading the Client's Opening Handshake (full spec)
 - [x] RFC-6455 4.2.2 Sending the Server's Opening Handshake
+- [ ] Hijack the tcp connection ready for bi-directional communication
 
 ** To Address **
 
