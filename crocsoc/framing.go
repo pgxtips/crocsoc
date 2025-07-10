@@ -2,8 +2,10 @@ package crocsoc
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"unicode/utf8"
 )
 
@@ -13,7 +15,7 @@ type Frame struct{
 	Payload []byte
 }
 
-func ReadMessage(conn io.Reader) (string, error) {
+func ReadMessage(conn net.Conn) (string, error) {
 	frags := []*Frame{}
 	var initialOpcode byte
 
@@ -21,12 +23,16 @@ func ReadMessage(conn io.Reader) (string, error) {
 		frame, err := readFrame(conn)
 
 		if err != nil {
+			// connection closed normally
+			if errors.Is(err, io.EOF) {
+				return "", nil
+			}
 			return "", fmt.Errorf("error reading message: %v", err)
 		}
 
 		// handle control frames
 		if isControlFrame(frame){
-			handleControlFrame(frame)
+			handleControlFrame(frame, conn)
 			continue
 		}
 
@@ -71,23 +77,54 @@ func ReadMessage(conn io.Reader) (string, error) {
 	}
 }
 
-
 func isControlFrame(f *Frame) bool{
 	switch f.Opcode{
+		case 0x8, // close
+		0x9,   // ping
+		0xA:   // pong
+		return true
 	default:
 		return false
 	}
 }
 
-func handleControlFrame(f *Frame){
+func handleControlFrame(f *Frame, conn io.Writer) error{
+	switch f.Opcode {
+	//close
+	case 0x8:
+		var code uint16
+		var reason string
 
+		if len(f.Payload) >= 2 {
+			code = binary.BigEndian.Uint16(f.Payload[:2])
+			reason = string(f.Payload[2:])
+		}
+
+		fmt.Printf("Received close frame: code=%d, reason=%q\n", code, reason)
+		return SendCloseFrame(conn, 1000, "Closing in response")
+	// ping 
+	case 0x9:
+		fmt.Println("Received ping")
+		return SendPongFrame(conn, f.Payload)
+	// pong 
+	case 0xA:
+		fmt.Println("Received pong")
+		return nil
+	default:
+		return fmt.Errorf("unknown control frame opcode: %x", f.Opcode)
+	}
 }
 
-func readFrame(conn io.Reader) (*Frame, error) {
+func readFrame(conn net.Conn) (*Frame, error) {
 	header := [2]byte{};
 	_, err := io.ReadFull(conn, header[:])
 
 	if err != nil {
+		// connection closed normally
+		if errors.Is(err, io.EOF) {
+			return nil, io.EOF
+		}
+
 		return nil, fmt.Errorf("failed to read frame header: %v", err)
 	}
 
@@ -152,4 +189,94 @@ zero, in which case the payload length is the length of the "Application data".
 		Opcode: opcode,
 		Payload: payload,
 	}, nil
+}
+
+func SendTextFrame(w io.Writer, data []byte) error {
+	frame := &Frame{
+		Fin:     true,
+		Opcode:  0x1, // text frame
+		Payload: data,
+	}
+	return WriteFrame(w, frame)
+}
+
+func SendPongFrame(w io.Writer, payload []byte) error {
+	frame := &Frame{
+		Fin:     true,
+		Opcode:  0xA, // pong frame
+		Payload: payload,
+	}
+	return WriteFrame(w, frame)
+}
+
+func SendCloseFrame(w io.Writer, code uint16, reason string) error {
+	payload := make([]byte, 2+len(reason))
+	binary.BigEndian.PutUint16(payload[:2], code)
+	copy(payload[2:], reason)
+
+	frame := &Frame{
+		Fin:     true,
+		Opcode:  0x8, // close frame
+		Payload: payload,
+	}
+	return WriteFrame(w, frame)
+}
+
+func SendBinaryFrame(w io.Writer, data []byte) error {
+	frame := &Frame{
+		Fin:     true,
+		Opcode:  0x2, // binary frame
+		Payload: data,
+	}
+	return WriteFrame(w, frame)
+}
+
+func WriteFrame(w io.Writer, f *Frame) error {
+	// header[0] byte
+	var b0 byte
+
+	if f.Fin {
+		b0 |= 0x80
+	}
+
+	b0 |= f.Opcode & 0x0F
+
+	header := []byte{b0}
+
+	// header[1] byte
+	// no mask bit needed (server -> client)
+	var b1 byte = 0x0
+
+	payloadLen := len(f.Payload)
+
+	switch {
+	case payloadLen <= 125:
+		b1 |= byte(payloadLen)
+		header = append(header, b1)
+	// uint16
+	case payloadLen <= 65535:
+		b1 |= 126
+		header = append(header, b1)
+
+		ext := make([]byte, 2)
+		binary.BigEndian.PutUint16(ext, uint16(payloadLen))
+		header = append(header, ext...)
+
+	default:
+		b1 |= 127
+		header = append(header, b1)
+
+		ext := make([]byte, 8)
+		binary.BigEndian.PutUint64(ext, uint64(payloadLen))
+		header = append(header, ext...)
+	}
+
+	// send header first seperately to allow larger payloads
+	_, err := w.Write(header)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(f.Payload)
+	return err
 }

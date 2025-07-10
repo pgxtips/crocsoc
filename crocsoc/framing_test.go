@@ -1,20 +1,21 @@
 package crocsoc
 
 import (
-	"bytes"
+	"net"
+	"sync"
 	"testing"
 )
 
 /*
 ALL TESTING VALUES PROVIDED FROM EXAMPLES IN RFC-6455
 
-A single-frame unmasked text message
+[x] A single-frame unmasked text message
 	-> 0x81 0x05 0x48 0x65 0x6c 0x6c 0x6f (contains "Hello")
 
-A single-frame masked text message
+[x] A single-frame masked text message
 	-> 0x81 0x85 0x37 0xfa 0x21 0x3d 0x7f 0x9f 0x4d 0x51 0x58 (contains "Hello")
 
-A fragmented unmasked text message
+[x] A fragmented unmasked text message
 	-> 0x01 0x03 0x48 0x65 0x6c (contains "Hel")
 	-> 0x80 0x02 0x6c 0x6f (contains "lo")
 
@@ -34,9 +35,19 @@ Unmasked Ping request and masked Ping response
 
 func TestUnmaskedFrame(t *testing.T){
 	d := []byte{0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f}
-	r := bytes.NewReader(d)
 
-	msg, err := ReadMessage(r)
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
+
+	go func(){
+		_, err := clientConn.Write(d)
+		if err != nil {
+			t.Errorf("failed to write test data: %v", err)
+		}
+	}()
+
+	msg, err := ReadMessage(serverConn)
 
 	if err != nil {
 		t.Errorf("%v", err)
@@ -50,9 +61,19 @@ func TestUnmaskedFrame(t *testing.T){
 
 func TestMaskedFrame(t *testing.T){
 	d := []byte{0x81,0x85,0x37,0xfa,0x21,0x3d,0x7f,0x9f,0x4d,0x51,0x58}
-	r := bytes.NewReader(d)
 
-	msg, err := ReadMessage(r)
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
+
+	go func(){
+		_, err := clientConn.Write(d)
+		if err != nil {
+			t.Errorf("failed to write test data: %v", err)
+		}
+	}()
+
+	msg, err := ReadMessage(serverConn)
 
 	if err != nil {
 		t.Errorf("%v", err)
@@ -69,10 +90,19 @@ func TestFragmentedFrames(t *testing.T){
 		0x01, 0x03, 0x48, 0x65, 0x6c,
 		0x80, 0x02, 0x6c, 0x6f,
 	}
-	r := bytes.NewReader(d)
 
-	msg, err := ReadMessage(r)
+	serverConn, clientConn := net.Pipe()
+	defer serverConn.Close()
+	defer clientConn.Close()
 
+	go func(){
+		_, err := clientConn.Write(d)
+		if err != nil {
+			t.Errorf("failed to write test data: %v", err)
+		}
+	}()
+
+	msg, err := ReadMessage(serverConn)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
@@ -81,5 +111,72 @@ func TestFragmentedFrames(t *testing.T){
 	if want != msg {
 		t.Errorf("want: %v, got: %v", want, msg)
 	}
+}
+
+func TestPingPongFrames(t *testing.T) {
+	ping := []byte{
+		0x89, 0x05, 'H', 'e', 'l', 'l', 'o',
+	}
+
+	serverConn, clientConn := net.Pipe()
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	// Client writes ping
+	go func(){
+		defer wg.Done()
+		_, err := clientConn.Write(ping)
+		if err != nil {
+			t.Errorf("client write error: %v", err)
+		}
+	}()
+
+	// Server responds pong (this will never end as there is no fin bit) 
+	go func(){
+		defer wg.Done()
+		_, err := ReadMessage(serverConn)
+		if err != nil {
+			t.Errorf("ReadMessage error: %v", err)
+		}
+	}()
+
+	// Client reads pong
+	go func(){
+		defer wg.Done()
+
+		// Read pong header
+		header := make([]byte, 2)
+		_, err := clientConn.Read(header)
+		if err != nil {
+			t.Errorf("client read error: %v", err)
+			return
+		}
+
+		opcode := header[0] & 0x0F
+		payloadLen := int(header[1] & 0x7F)
+
+		payload := make([]byte, payloadLen)
+		_, err = clientConn.Read(payload)
+		if err != nil {
+			t.Errorf("client payload read error: %v", err)
+			return
+		}
+
+		// pong opcode
+		if opcode != 0x0a {
+			t.Errorf("want: 0x0a, got: %x", opcode)
+		}
+
+		if string(payload) != "Hello" {
+			t.Errorf("want: Hello, got: %s", string(payload))
+		}
+
+		// t.Logf("Opcode: %02x", opcode)
+		// t.Logf("Payload: %s", payload)
+		clientConn.Close()
+	}()
+
+	wg.Wait()
 }
 

@@ -10,11 +10,12 @@ A complete RFC-compliant implementation of the websocket protocol.
 - [x] Hijack the tcp connection ready for bi-directional communication
 - [x] RFC-6455 5.2 Frame Read (single frame)
 - [x] RFC-6455 5.2 Frame Read (fragmented frames)
-- [ ] RFC-6455 5.2 Frame Read (handle control frames)
+- [x] RFC-6455 5.2 Frame RW Control Frames (Ping, Pong, Text, Binary)
 
 ** To Address **
 
-- [ ] The lib does not implement the use of any subprotocols e.g. chat, superchat, etc.
+- [ ] does not implement the use of any subprotocols e.g. chat, superchat, etc.
+- [ ] currently does not fragment outgoing messages.
 
 ## Running tests
 
