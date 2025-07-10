@@ -88,7 +88,7 @@ func isControlFrame(f *Frame) bool{
 	}
 }
 
-func handleControlFrame(f *Frame, conn io.Writer) error{
+func handleControlFrame(f *Frame, conn net.Conn) error{
 	switch f.Opcode {
 	//close
 	case 0x8:
@@ -191,25 +191,25 @@ zero, in which case the payload length is the length of the "Application data".
 	}, nil
 }
 
-func SendTextFrame(w io.Writer, data []byte) error {
+func SendTextFrame(conn net.Conn, data []byte) error {
 	frame := &Frame{
 		Fin:     true,
 		Opcode:  0x1, // text frame
 		Payload: data,
 	}
-	return WriteFrame(w, frame)
+	return WriteFrame(conn, frame)
 }
 
-func SendPongFrame(w io.Writer, payload []byte) error {
+func SendPongFrame(conn net.Conn, payload []byte) error {
 	frame := &Frame{
 		Fin:     true,
 		Opcode:  0xA, // pong frame
 		Payload: payload,
 	}
-	return WriteFrame(w, frame)
+	return WriteFrame(conn, frame)
 }
 
-func SendCloseFrame(w io.Writer, code uint16, reason string) error {
+func SendCloseFrame(conn net.Conn, code uint16, reason string) error {
 	payload := make([]byte, 2+len(reason))
 	binary.BigEndian.PutUint16(payload[:2], code)
 	copy(payload[2:], reason)
@@ -219,19 +219,19 @@ func SendCloseFrame(w io.Writer, code uint16, reason string) error {
 		Opcode:  0x8, // close frame
 		Payload: payload,
 	}
-	return WriteFrame(w, frame)
+	return WriteFrame(conn, frame)
 }
 
-func SendBinaryFrame(w io.Writer, data []byte) error {
+func SendBinaryFrame(conn net.Conn, data []byte) error {
 	frame := &Frame{
 		Fin:     true,
 		Opcode:  0x2, // binary frame
 		Payload: data,
 	}
-	return WriteFrame(w, frame)
+	return WriteFrame(conn, frame)
 }
 
-func WriteFrame(w io.Writer, f *Frame) error {
+func WriteFrame(conn net.Conn, f *Frame) error {
 	// header[0] byte
 	var b0 byte
 
@@ -272,12 +272,12 @@ func WriteFrame(w io.Writer, f *Frame) error {
 	}
 
 	// send header first seperately to allow larger payloads
-	_, err := w.Write(header)
+	_, err := conn.Write(header)
 	if err != nil {
 		return err
 	}
 
-	_, err = w.Write(f.Payload)
+	_, err = conn.Write(f.Payload)
 	return err
 }
 
