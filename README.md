@@ -9,9 +9,13 @@ A complete RFC-compliant implementation of the websocket protocol.
 - [x] RFC-6455 4.2.2 Sending the Server's Opening Handshake
 - [x] Hijack the tcp connection ready for bi-directional communication
 - [x] RFC-6455 5.2 Frame Read (single frame)
-- [x] RFC-6455 5.2 Frame Read (fragmented frames)
-- [x] RFC-6455 5.2 Frame RW Control Frames (Ping, Pong, Text, Binary)
-- [x] RFC-6455 5.2 Frame Reading (Both Text and Binary Frames)
+- [x] RFC-6455 5.3 Client-to-Server Masking
+- [x] RFC-6455 5.4 Fragmentation (fragmented frames)
+- [x] RFC-6455 5.5.1 Close
+- [x] RFC-6455 5.5.2 Ping (processing client ping)
+- [x] RFC-6455 5.5.3 Pong
+- [x] RFC-6455 5.6 Data Frames (Text & Binary)
+
 
 ** To Address **
 

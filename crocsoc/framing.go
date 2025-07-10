@@ -32,7 +32,11 @@ func ReadMessage(conn net.Conn) ([]byte, error) {
 
 		// handle control frames
 		if isControlFrame(frame){
-			handleControlFrame(frame, conn)
+			err := handleControlFrame(frame, conn)
+			if err != nil {
+				return []byte{}, err 
+			}
+
 			continue
 		}
 
@@ -101,7 +105,17 @@ func handleControlFrame(f *Frame, conn net.Conn) error{
 		}
 
 		fmt.Printf("Received close frame: code=%d, reason=%q\n", code, reason)
-		return SendCloseFrame(conn, 1000, "Closing in response")
+
+		err := SendCloseFrame(conn, 1000, "Closing in response")
+
+		if err != nil {
+			return err
+		}
+
+		conn.Close()
+
+		return io.EOF
+
 	// ping 
 	case 0x9:
 		fmt.Println("Received ping")
