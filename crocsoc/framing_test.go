@@ -36,16 +36,15 @@ func TestUnmaskedFrame(t *testing.T){
 	d := []byte{0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f}
 	r := bytes.NewReader(d)
 
-	frame, err := ReadFrame(r)
+	msg, err := ReadMessage(r)
 
 	if err != nil {
 		t.Errorf("%v", err)
 	}
 
 	want := "Hello"
-	got := string(frame.Payload)
-	if want != got{
-		t.Errorf("want: %v, got: %v", want, got)
+	if want != msg {
+		t.Errorf("want: %v, got: %v", want, msg)
 	}
 }
 
@@ -53,15 +52,34 @@ func TestMaskedFrame(t *testing.T){
 	d := []byte{0x81,0x85,0x37,0xfa,0x21,0x3d,0x7f,0x9f,0x4d,0x51,0x58}
 	r := bytes.NewReader(d)
 
-	frame, err := ReadFrame(r)
+	msg, err := ReadMessage(r)
 
 	if err != nil {
 		t.Errorf("%v", err)
 	}
 
 	want := "Hello"
-	got := string(frame.Payload)
-	if want != got{
-		t.Errorf("want: %v, got: %v", want, got)
+	if want != msg {
+		t.Errorf("want: %v, got: %v", want, msg)
 	}
 }
+
+func TestFragmentedFrames(t *testing.T){
+	d := []byte{
+		0x01, 0x03, 0x48, 0x65, 0x6c,
+		0x80, 0x02, 0x6c, 0x6f,
+	}
+	r := bytes.NewReader(d)
+
+	msg, err := ReadMessage(r)
+
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	want := "Hello"
+	if want != msg {
+		t.Errorf("want: %v, got: %v", want, msg)
+	}
+}
+

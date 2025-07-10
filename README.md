@@ -9,6 +9,8 @@ A complete RFC-compliant implementation of the websocket protocol.
 - [x] RFC-6455 4.2.2 Sending the Server's Opening Handshake
 - [x] Hijack the tcp connection ready for bi-directional communication
 - [x] RFC-6455 5.2 Frame Read (single frame)
+- [x] RFC-6455 5.2 Frame Read (fragmented frames)
+- [ ] RFC-6455 5.2 Frame Read (handle control frames)
 
 ** To Address **
 
