@@ -1,6 +1,7 @@
 package crocsoc
 
 import (
+	"bytes"
 	"net"
 	"sync"
 	"testing"
@@ -10,26 +11,26 @@ import (
 ALL TESTING VALUES PROVIDED FROM EXAMPLES IN RFC-6455
 
 [x] A single-frame unmasked text message
-	-> 0x81 0x05 0x48 0x65 0x6c 0x6c 0x6f (contains "Hello")
+-> 0x81 0x05 0x48 0x65 0x6c 0x6c 0x6f (contains "Hello")
 
 [x] A single-frame masked text message
-	-> 0x81 0x85 0x37 0xfa 0x21 0x3d 0x7f 0x9f 0x4d 0x51 0x58 (contains "Hello")
+-> 0x81 0x85 0x37 0xfa 0x21 0x3d 0x7f 0x9f 0x4d 0x51 0x58 (contains "Hello")
 
 [x] A fragmented unmasked text message
-	-> 0x01 0x03 0x48 0x65 0x6c (contains "Hel")
-	-> 0x80 0x02 0x6c 0x6f (contains "lo")
+-> 0x01 0x03 0x48 0x65 0x6c (contains "Hel")
+-> 0x80 0x02 0x6c 0x6f (contains "lo")
 
 Unmasked Ping request and masked Ping response
-	-> 0x89 0x05 0x48 0x65 0x6c 0x6c 0x6f (contains a body of "Hello", but the contents
-	of the body are arbitrary)
-	-> 0x8a 0x85 0x37 0xfa 0x21 0x3d 0x7f 0x9f 0x4d 0x51 0x58 (contains a body
-	of "Hello", matching the body of the ping)
+-> 0x89 0x05 0x48 0x65 0x6c 0x6c 0x6f (contains a body of "Hello", but the contents
+of the body are arbitrary)
+-> 0x8a 0x85 0x37 0xfa 0x21 0x3d 0x7f 0x9f 0x4d 0x51 0x58 (contains a body
+of "Hello", matching the body of the ping)
 
 256 bytes binary message in a single unmasked frame
-	-> 0x82 0x7E 0x0100 [256 bytes of binary data]
+-> 0x82 0x7E 0x0100 [256 bytes of binary data]
 
 64KiB binary message in a single unmasked frame
-	-> 0x82 0x7F 0x0000000000010000 [65536 bytes of binary data]
+-> 0x82 0x7F 0x0000000000010000 [65536 bytes of binary data]
 
 */
 
@@ -54,8 +55,8 @@ func TestUnmaskedFrame(t *testing.T){
 	}
 
 	want := "Hello"
-	if want != msg {
-		t.Errorf("want: %v, got: %v", want, msg)
+	if want != string(msg) {
+		t.Errorf("want: %v, got: %v", want, string(msg))
 	}
 }
 
@@ -80,8 +81,8 @@ func TestMaskedFrame(t *testing.T){
 	}
 
 	want := "Hello"
-	if want != msg {
-		t.Errorf("want: %v, got: %v", want, msg)
+	if want != string(msg) {
+		t.Errorf("want: %v, got: %v", want, string(msg))
 	}
 }
 
@@ -108,7 +109,7 @@ func TestFragmentedFrames(t *testing.T){
 	}
 
 	want := "Hello"
-	if want != msg {
+	if want != string(msg) {
 		t.Errorf("want: %v, got: %v", want, msg)
 	}
 }
@@ -179,4 +180,72 @@ func TestPingPongFrames(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestBinary256Frame(t *testing.T) {
+	// create 256-byte payload
+	payload := bytes.Repeat([]byte{0xFF}, 256)
+
+	// frame header:
+	// - 0x82 = FIN + binary frame
+	// - 0x7E signals 16-bit extended payload length follows
+	// - 0x01 0x00 = length 256 bytes
+	frame := []byte{
+		0x82,
+		0x7E,
+		0x01, 0x00,
+	}
+	frame = append(frame, payload...)
+
+	serverConn, clientConn := net.Pipe()
+
+	// write frame to the "client" side
+	go func() {
+		clientConn.Write(frame)
+	}()
+
+	msg, err := ReadMessage(serverConn)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !bytes.Equal(msg, payload) {
+		t.Errorf("payload mismatch: got %x, want %x", msg, payload)
+	}
+}
+
+func TestBinary64kFrame(t *testing.T) {
+	// create 256-byte payload
+	payload := bytes.Repeat([]byte{0xFF}, 65536)
+
+	// frame header:
+	// - 0x82 = FIN + binary frame
+	// - 0x7E signals 16-bit extended payload length follows
+	// - 0x01 0x00 = length 256 bytes
+	frame := []byte{
+		0x82,
+		0x7F,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x01, 0x00, 0x00,
+	}
+	frame = append(frame, payload...)
+
+	serverConn, clientConn := net.Pipe()
+
+	// write frame to the "client" side
+	go func() {
+		clientConn.Write(frame)
+	}()
+
+	msg, err := ReadMessage(serverConn)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !bytes.Equal(msg, payload) {
+		t.Errorf("payload mismatch: got %x, want %x", msg, payload)
+	}
+}
+
 

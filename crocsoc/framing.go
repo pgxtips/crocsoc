@@ -15,7 +15,7 @@ type Frame struct{
 	Payload []byte
 }
 
-func ReadMessage(conn net.Conn) (string, error) {
+func ReadMessage(conn net.Conn) ([]byte, error) {
 	frags := []*Frame{}
 	var initialOpcode byte
 
@@ -25,9 +25,9 @@ func ReadMessage(conn net.Conn) (string, error) {
 		if err != nil {
 			// connection closed normally
 			if errors.Is(err, io.EOF) {
-				return "", nil
+				return []byte{}, nil
 			}
-			return "", fmt.Errorf("error reading message: %v", err)
+			return []byte{}, fmt.Errorf("error reading message: %v", err)
 		}
 
 		// handle control frames
@@ -41,12 +41,12 @@ func ReadMessage(conn net.Conn) (string, error) {
 			initialOpcode = frame.Opcode
 			// only text and binary frames accepted
 			if initialOpcode != 0x1 && initialOpcode != 0x2 {
-				return "", fmt.Errorf("unsupported opcode %x", initialOpcode)
+				return []byte{}, fmt.Errorf("unsupported opcode %x", initialOpcode)
 			}
 		} else {
 			// all subsequent fragments must be continuation frames opcode 0x0
 			if frame.Opcode != 0x0 {
-				return "", fmt.Errorf("unexpected opcode %x in continuation frame", frame.Opcode)
+				return []byte{}, fmt.Errorf("unexpected opcode %x in continuation frame", frame.Opcode)
 			}
 		}
 
@@ -62,17 +62,17 @@ func ReadMessage(conn net.Conn) (string, error) {
 			// text frame
 			if initialOpcode == 0x1 {
 				if !utf8.Valid(payload) {
-					return "", fmt.Errorf("invalid UTF-8 in text frame")
+					return []byte{}, fmt.Errorf("invalid UTF-8 in text frame")
 				}
-				return string(payload), nil
+				return payload, nil
 			}
 
 			// @todo: binary frame (for now just error)
 			if initialOpcode == 0x2 {
-				return "", fmt.Errorf("binary frames not supported yet")
+				return payload, nil
 			}
 
-			return "", fmt.Errorf("unknown opcode: %x", frame.Opcode)
+			return []byte{}, fmt.Errorf("unknown opcode: %x", frame.Opcode)
 		}
 	}
 }
@@ -280,3 +280,4 @@ func WriteFrame(w io.Writer, f *Frame) error {
 	_, err = w.Write(f.Payload)
 	return err
 }
+

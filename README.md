@@ -11,6 +11,7 @@ A complete RFC-compliant implementation of the websocket protocol.
 - [x] RFC-6455 5.2 Frame Read (single frame)
 - [x] RFC-6455 5.2 Frame Read (fragmented frames)
 - [x] RFC-6455 5.2 Frame RW Control Frames (Ping, Pong, Text, Binary)
+- [x] RFC-6455 5.2 Frame Reading (Both Text and Binary Frames)
 
 ** To Address **
 
