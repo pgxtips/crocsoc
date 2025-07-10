@@ -374,7 +374,7 @@ func OpeningHandshake(w http.ResponseWriter, r *http.Request) error {
 
 	// ensure that headers are correctly received 
 	if err := ValidateHeaders(r); err != nil {
-		return fmt.Errorf(err.Error())
+		return fmt.Errorf("%v", err.Error())
 	}
 
 	// create the server response hash

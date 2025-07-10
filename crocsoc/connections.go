@@ -13,6 +13,8 @@ type WSConn struct {
 }
 
 func ServeConn(conn WSConn) {
+	defer conn.Conn.Close()
 	for {
+
 	}
 }
